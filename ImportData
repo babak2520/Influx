@@ -1,0 +1,46 @@
+import pandas
+###Read the csv file containing the data. As of now, if there is a column without header 
+###(usually the last one after memo), this will raise an exception.
+
+def GetDataFromCSVFile(FileName, RigStateCol = 'Rig Super State', DateCol = 'YYYY/MM/DD',TimeCol = 'HH:MM:SS'):
+
+    df = pandas.read_csv(FileName, parse_dates = [[DateCol, TimeCol]])
+    df.index = df["{}_{}".format(DateCol, TimeCol)]
+
+    ###Process the data and determine time chunks based on "Rig Super State".
+    ###Three lists will be outputted: OpStartT (denoting the start time stamp) OpEndT (denoting the end time stamp)
+    ###and OpCode (denoting the super stateb associed with each time interval)
+
+    First = df[RigStateCol][0]
+    OpCode = [First]
+    OpStartT = [df.index[0]]
+    LastIndex = df.index[0]
+    OpEndT = []
+    LastOpCode = First
+    NASup = False
+    SuperStateVals = {0, 1, 4, 5, 6, 7}
+    for index, entry in df.iterrows():
+        if NASup == True:
+            OpCode.append(entry[RigStateCol])
+        if entry[RigStateCol] not in SuperStateVals:
+            OpEndT.append(index)
+            OpStartT.append(index)
+            NASup = True
+        elif entry[RigStateCol] != LastOpCode and not NASup:
+    ###     MeanIndex = pandas.Timestamp((index.value + LastIndex.value)/2.0)  ###Not using this line
+            OpEndT.append(LastIndex)
+            OpStartT.append(index)
+            OpCode.append(entry[RigStateCol])
+            NASup = False
+        else:
+            NASup = False
+
+        LastIndex = index
+        LastOpCode = entry[RigStateCol]
+    OpEndT.append(LastIndex)
+
+    ### Create a list of dataframes (dfOps) with elements comprised of a chunk of data with same operation code
+    dfOps = []
+    for i in range(len(OpCode)):
+        dfOps.append(df.loc[OpStartT[i]:OpEndT[i]])
+    return (OpCode , dfOps)
